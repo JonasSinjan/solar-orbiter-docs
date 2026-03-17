@@ -94,7 +94,7 @@ plt.title("SO/PHI-HRT Blos")
 plt.show()
 
 ###############################################################################
-# Loading PHI-HRT Stokes Data
+# Loading,Plotting PHI-HRT Stokes Data
 # -------------------------------------------
 #
 # The Stokes data product contain the Stokes I,Q,U,V parameters
@@ -112,8 +112,6 @@ search_results_phi_hrt = Fido.search(a.Instrument('PHI'), a.Time(t_start_hrt.val
 phi_file = Fido.fetch(search_results_phi_hrt[0, 0], path='./')
 old_stokes = fits.getdata(phi_file[0])
 
-########################################
-
 # Get a 2023 example
 t_start_hrt_new = Time('2023-03-29T11:40', format='isot', scale='utc')
 t_end_hrt_new = Time('2023-03-29T11:41', format='isot', scale='utc')
@@ -122,19 +120,13 @@ search_results_phi_hrt_new = Fido.search(a.Instrument('PHI'), a.Time(t_start_hrt
 phi_file_new = Fido.fetch(search_results_phi_hrt_new[0, 0], path='./')
 new_stokes = fits.getdata(phi_file_new[0])
 
-########################################
-
 # Show the different dimensions
 print(f"2022 Stokes shape: {old_stokes.shape} (Y, X, Stokes, Wavelength)")
 print(f"2023 Stokes shape: {new_stokes.shape} (Stokes, Wavelength, Y, X)")
 
-###############################################################################
-# Helper Functions for Plotting PHI-HRT Stokes Data
-# ---------------------------------
-#
 # Load the HRT field stop map (to mask out the edges)
 
-def load_field_stop(path = None):
+def load_field_stop():
     """load hrt field stop
 
     Parameters
@@ -147,8 +139,7 @@ def load_field_stop(path = None):
     field_stop: numpy ndarray
         the field stop of the HRT telescope.
     """
-    if path is None:
-        path = "./data/HRT_field_stop.fits"
+    path = "./data/HRT_field_stop.fits"
     
     hdu_list_tmp = fits.open(path)
     field_stop = np.asarray(hdu_list_tmp[0].data, dtype=np.float32)
@@ -156,11 +147,9 @@ def load_field_stop(path = None):
     
     return field_stop
 
-########################################
-
 # Plotting function
 
-def plot_hrt_stokes(stokes,wv,subsec=None, title=None):
+def plot_hrt_stokes(stokes,wv,title=None):
     """plot hrt stokes maps at one wavelength
 
     Parameters
@@ -181,10 +170,10 @@ def plot_hrt_stokes(stokes,wv,subsec=None, title=None):
     fs = load_field_stop()[:,::-1]
     fs = np.where(fs > 0,1,np.nan)
 
-
     fig, (ax1, ax2) = plt.subplots(2,2, figsize = (15,12))
 
-    assert stokes.ndim == 4
+    if stokes.ndim != 4:
+        raise ValueError("Stokes array must be 4D with dimensions (Stokes, Wavelength, Y, X) or (Y, X, Stokes, Wavelength)")
     if stokes.shape[0] == 6 and stokes.shape[1] == 4:
         print('New Stokes order format')
         stokes_arr = stokes
@@ -195,22 +184,8 @@ def plot_hrt_stokes(stokes,wv,subsec=None, title=None):
     fs_start = (2048 - stokes_arr.shape[2])//2
     fs_end = fs_start + stokes_arr.shape[2]
     fs = fs[fs_start:fs_end, fs_start:fs_end]
-    
-    if subsec is not None:
-        start_row, end_row = subsec[2:4]
-        start_col, end_col = subsec[:2]
-        assert len(subsec) == 4
-        assert start_row >= 0 and start_row < 2048
-        assert end_row >= 0 and end_row < 2048
-        assert start_col >= 0 and start_col < 2048
-        assert end_col >= 0 and end_col < 2048
-        fs = fs[start_row:end_row, start_col:end_col]
-        
-    else:
-        start_row, start_col = 0,0
-        end_row, end_col = stokes_arr.shape[2],stokes_arr.shape[3]
 
-    stokes_arr = stokes_arr[:,:,start_row:end_row,start_col:end_col] * fs[np.newaxis, np.newaxis, :, :]
+    stokes_arr = stokes_arr * fs[np.newaxis, np.newaxis, :, :]
     
     cmap = mpl.colormaps["gist_heat"]
     cmap.set_bad(color='black')
@@ -249,19 +224,15 @@ def plot_hrt_stokes(stokes,wv,subsec=None, title=None):
     plt.tight_layout()
     plt.show()
 
-###############################################################################
-# Plot the PHI-HRT Stokes Data
-# --------------------------------
-
+#################################
 # Plot the old stokes
 
-plot_hrt_stokes(old_stokes, wv=3, title='Old Stokes Format') #subsec=[100, 900, 100, 900]
+plot_hrt_stokes(old_stokes, wv=3, title='Old Stokes Format')
 
-########################################
+#################################
+# Plot the new stokes 
 
-# Plot the new stokes
-
-plot_hrt_stokes(new_stokes, wv=3, title='New Stokes Format') #subsec=[100, 900, 100, 900]
+plot_hrt_stokes(new_stokes, wv=3, title='New Stokes Format')
 
 ###############################################################################
 # Searching for PHI-FDT Blos Data
